@@ -1,15 +1,21 @@
 import {effects} from './upstream/src/fx/index.js';
 import {createFrame, clearFrame, createFx, composite, backdrop, painterFor, drawActor, stockActor, actorAlphaOf} from './upstream/src/core/index.js';
 const $ = s => document.querySelector(s);
-const catNames = {uulab:'UULAB',moves:'MOVES',fire:'FIRE',explosions:'EXPLOSION',water:'WATER',ice:'ICE',lightning:'LIGHTNING','sci-fi':'SCI-FI',melee:'MELEE',impacts:'IMPACT',projectiles:'PROJECTILE','spawn-death':'SPAWN',arcane:'ARCANE',holy:'HOLY',shadow:'SHADOW',status:'STATUS',nature:'NATURE',weather:'WEATHER',ui:'UI',pickups:'PICKUP',transitions:'TRANSITION',critters:'CREATURE'};
+const catNames = {moves:'MOVES',fire:'FIRE',explosions:'EXPLOSION',water:'WATER',ice:'ICE',lightning:'LIGHTNING','sci-fi':'SCI-FI',melee:'MELEE',impacts:'IMPACT',projectiles:'PROJECTILE','spawn-death':'SPAWN',arcane:'ARCANE',holy:'HOLY',shadow:'SHADOW',status:'STATUS',nature:'NATURE',weather:'WEATHER',ui:'UI',pickups:'PICKUP',transitions:'TRANSITION',critters:'CREATURE'};
 const catLabel = s => catNames[s] || s.toUpperCase().replaceAll('-', ' ');
+function customCategory(tags) {
+  const rules=[['ice',['ice','frost']],['fire',['fire','flame','ember']],['lightning',['lightning','electric']],['water',['water']],['sci-fi',['sci-fi','shield','technology']],['moves',['jump','dash','movement','dust']],['melee',['melee','slash','sword']],['impacts',['impact','hit','combat']],['pickups',['pickup','collect','coin']],['ui',['ui','victory','reward','upgrade','crafting']],['status',['warning','danger','telegraph','status']],['nature',['nature','forest','ambient','leaves']],['transitions',['transition','portal']],['holy',['heal','healing']],['arcane',['magic','spell']]];
+  const values=tags.map(t=>String(t).toLowerCase());
+  return rules.find(([,terms])=>terms.some(t=>values.includes(t)))?.[0] || 'arcane';
+}
 let all=[], current='all', query='', players=new Set(), detailPlayer=null;
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 function node(tag, cls, text) { const n=document.createElement(tag); if(cls)n.className=cls; if(text!==undefined)n.textContent=text; return n; }
 function buildEffect(id, mod) {
   if (!mod || !mod.meta || (!mod.draw && !mod.create)) return null;
   const meta={name:id.split('/').pop().replaceAll('-',' '),size:[96,96],origin:[48,48],duration:1,fps:30,loop:false,bg:'dark',tags:[],...mod.meta};
-  return {id, cat:id.split('/')[0], meta, mod:{...mod,meta}};
+  const original=id.startsWith('uulab/');
+  return {id, cat:original?customCategory(meta.tags):id.split('/')[0], original, meta, mod:{...mod,meta}};
 }
 class Player {
   constructor(canvas, fx) {
@@ -27,7 +33,7 @@ class Player {
 }
 const observer=new IntersectionObserver(entries=>{for(const e of entries){const item=e.target;if(e.isIntersecting){if(!item._player){try{item._player=new Player(item.querySelector('canvas'),item._effect);}catch(err){console.error(item._effect.id,err);}}if(item._player)players.add(item._player);}else if(item._player)players.delete(item._player);}}, {rootMargin:'120px'});
 let last=performance.now(), elapsed=0;function animate(now){const dt=Math.min((now-last)/1000,.05);last=now;elapsed+=dt;if(elapsed>=1/24){for(const p of players)p.tick(elapsed);if(detailPlayer)detailPlayer.tick(elapsed);elapsed=0;}requestAnimationFrame(animate);}requestAnimationFrame(animate);
-function showDetail(fx){$('#detailCat').textContent=catLabel(fx.cat)+' / '+fx.id;$('#detailName').textContent=fx.meta.name;$('#detailDesc').textContent=fx.meta.desc||'Pixel effect';const m=$('#detailMeta');m.replaceChildren();for(const value of [fx.meta.loop?'LOOP':'ONE SHOT',`${fx.meta.duration}s`,`${fx.meta.fps} FPS`,fx.cat==='uulab'?'UULAB ORIGINAL':'PIXELFX'])m.append(node('span','',value));$('#detail').showModal();detailPlayer=new Player($('#detailCanvas'),fx);}
+function showDetail(fx){$('#detailCat').textContent=catLabel(fx.cat)+' / '+fx.id;$('#detailName').textContent=fx.meta.name;$('#detailDesc').textContent=fx.meta.desc||'Pixel effect';const m=$('#detailMeta');m.replaceChildren();for(const value of [fx.meta.loop?'LOOP':'ONE SHOT',`${fx.meta.duration}s`,`${fx.meta.fps} FPS`,fx.original?'GAME SKILLS ORIGINAL':'PIXELFX'])m.append(node('span','',value));$('#detail').showModal();detailPlayer=new Player($('#detailCanvas'),fx);}
 $('#close').addEventListener('click',()=>$('#detail').close());$('#detail').addEventListener('close',()=>{detailPlayer=null});$('#detail').addEventListener('click',e=>{if(e.target===$('#detail'))$('#detail').close()});
 function drawFilters(){const cats=['all',...new Set(all.map(x=>x.cat))];const f=$('#filters');f.replaceChildren();for(const cat of cats){const b=node('button',cat===current?'active':'',cat==='all'?'전체 효과':catLabel(cat));b.type='button';b.setAttribute('aria-pressed',cat===current?'true':'false');b.onclick=()=>{current=cat;drawFilters();render();};f.append(b);}}
 function render(){for(const p of players)players.delete(p);observer.disconnect();const grid=$('#grid');grid.replaceChildren();const q=query.trim().toLowerCase();const filtered=all.filter(fx=>(current==='all'||fx.cat===current)&&(!q||[fx.id,fx.meta.name,fx.meta.desc,...fx.meta.tags].join(' ').toLowerCase().includes(q)));$('#resultCount').textContent=`${filtered.length}개의 효과`;$('#empty').hidden=filtered.length>0;
