@@ -41,7 +41,8 @@ function render(){for(const p of players)players.delete(p);observer.disconnect()
 $('#search').addEventListener('input',e=>{query=e.target.value;render()});$('#reset').onclick=()=>{current='all';query='';$('#search').value='';drawFilters();render()};document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA'].includes(document.activeElement.tagName)&&!$('#detail').open){e.preventDefault();$('#search').focus();}});
 try{
   const upstream=Object.entries(effects).map(([id,mod])=>buildEffect(id,mod)).filter(Boolean);
-  const res=await fetch(new URL('./api/custom.json?v=20261102b', import.meta.url));if(!res.ok)throw new Error('custom list unavailable');const names=await res.json();
+  const listUrl=new URL('./api/custom.json', import.meta.url);listUrl.search=new URL(import.meta.url).search;
+  const res=await fetch(listUrl);if(!res.ok)throw new Error('custom list unavailable');const names=await res.json();
   const custom=await Promise.all(names.map(async name=>{try{return buildEffect('uulab/'+name.replace(/\.js$/,''),await import(new URL('./upstream/src/fx/uulab/'+encodeURIComponent(name),import.meta.url)));}catch(err){console.error('Custom effect failed:',name,err);return null;}}));
   all=[...custom.filter(Boolean),...upstream];$('#totalCount').textContent=String(all.length);drawFilters();render();
 }catch(err){console.error(err);$('#resultCount').textContent='불러오기 실패';const e=$('#error');e.hidden=false;e.textContent='효과 라이브러리를 불러오지 못했습니다. 로컬 서버와 PixelFX 경로를 확인해 주세요.';}
